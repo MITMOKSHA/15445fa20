@@ -69,7 +69,7 @@ class TrieNode {
    * @return True if this trie node has a child with given key, false otherwise.
    */
   bool HasChild(char key_char) const {
-    return (children_.find(key_char) != children_.end());  // find it.
+    return children_.find(key_char) != children_.end();  // find it.
   }
 
   /**
@@ -325,7 +325,7 @@ class Trie {
       return false;
     }
     latch_.WUnlock();
-    return is_exist;  // return whether the key already exists.
+    return !is_exist;  // return whether the key already exists.
   }
 
   /**
