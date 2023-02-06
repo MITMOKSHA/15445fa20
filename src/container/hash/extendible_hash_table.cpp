@@ -107,6 +107,7 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
     // initialize the augment slot in dir_.
     for (int i = before_len; i < len; ++i) {
       dir_[i] = std::make_shared<Bucket>(bucket_size_, global_depth_);
+      num_buckets_++;
     }
     RedistributeBucket(dir_[origin]);  // pass original bucket.
     bucket = dir_[IndexOf(key)].get();
