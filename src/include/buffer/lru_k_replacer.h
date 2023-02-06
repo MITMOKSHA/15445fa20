@@ -12,12 +12,13 @@
 
 #pragma once
 
+#include <climits>  // use INT_MAX
 #include <limits>
 #include <list>
 #include <mutex>  // NOLINT
 #include <unordered_map>
+#include <utility>
 #include <vector>
-#include <limits.h>  // use INT_MAX
 
 #include "common/config.h"
 #include "common/macros.h"
@@ -144,7 +145,7 @@ class LRUKReplacer {
   size_t k_;
   std::mutex latch_;
   std::list<std::pair<int, int>> lru_replacer_;  // <frame_id, k_distance>
-  std::vector<std::vector<int>> record_;  // record the K nums of access history.
+  std::vector<std::vector<int>> record_;         // record the K nums of access history.
   std::unordered_map<int, std::list<std::pair<int, int>>::iterator> hash_;
 };
 

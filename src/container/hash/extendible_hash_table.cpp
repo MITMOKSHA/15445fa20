@@ -77,7 +77,7 @@ auto ExtendibleHashTable<K, V>::Find(const K &key, V &value) -> bool {
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Remove(const K &key) -> bool {
   std::scoped_lock<std::mutex> lock(latch_);
-  for (auto bucket : dir_) {
+  for (auto &bucket : dir_) {
     Bucket *l = bucket.get();
     if (l->Remove(key)) {
       return true;
@@ -116,17 +116,17 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
 
 template <typename K, typename V>
 void ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucket) {
-  auto &list = bucket.get()->GetItems();
+  auto &list = bucket->GetItems();
   std::vector<std::pair<K, V>> del;  // elements will be deleted.
-  for (auto elem : list) {
+  for (auto &elem : list) {
     std::shared_ptr<Bucket> b = dir_[IndexOf(elem.first)];
     // reshuffle the elements in the bucket which will be overflowed to other bucket.
     if (b != bucket) {
-      b.get()->Insert(elem.first, elem.second);
+      b->Insert(elem.first, elem.second);
       del.push_back(elem);  // bookkeeping the elements will be deleted
     }
   }
-  for (auto e : del) {
+  for (auto &e : del) {
     list.remove(e);
   }
 }
@@ -140,7 +140,7 @@ ExtendibleHashTable<K, V>::Bucket::Bucket(size_t array_size, int depth) : size_(
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Bucket::Find(const K &key, V &value) -> bool {
   auto list = GetItems();
-  for (auto c : list) {
+  for (auto &c : list) {
     if (c.first == key) {
       value = c.second;  // store the V to value
       return true;
@@ -153,7 +153,7 @@ template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Bucket::Remove(const K &key) -> bool {
   auto &list = GetItems();
   int i = 0;
-  for (auto c : list) {
+  for (auto &c : list) {
     i++;
     if (c.first == key) {
       list.remove(c);  // c++ 20 trait.
@@ -170,14 +170,14 @@ auto ExtendibleHashTable<K, V>::Bucket::Insert(const K &key, const V &value) -> 
     return false;
   }
   auto &list = GetItems();  // it should be use reference.
-  bool is_exist_ = false;
+  bool is_exist = false;
   for (auto &c : list) {
     if (c.first == key) {
       c.second = value;  // if the key exist, update it.
-      is_exist_ = true;
+      is_exist = true;
     }
   }
-  if (!is_exist_) {
+  if (!is_exist) {
     list.push_back({key, value});  // if the key does not exist, push the KV pair to bucket.
   }
   return true;
