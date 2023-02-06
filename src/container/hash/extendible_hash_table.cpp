@@ -59,7 +59,7 @@ auto ExtendibleHashTable<K, V>::GetLocalDepthInternal(int dir_index) const -> in
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::GetNumBuckets() const -> int {
-  // std::scoped_lock<std::mutex> lock(latch_);
+  std::scoped_lock<std::mutex> lock(latch_);
   return GetNumBucketsInternal();
 }
 
