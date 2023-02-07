@@ -37,7 +37,7 @@ auto ExtendibleHashTable<K, V>::IndexOf(const K &key) -> size_t {
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::GetGlobalDepth() const -> int {
-  // std::scoped_lock<std::mutex> lock(latch_);
+  std::scoped_lock<std::mutex> lock(latch_);
   return GetGlobalDepthInternal();
 }
 
@@ -48,7 +48,7 @@ auto ExtendibleHashTable<K, V>::GetGlobalDepthInternal() const -> int {
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::GetLocalDepth(int dir_index) const -> int {
-  // std::scoped_lock<std::mutex> lock(latch_);
+  std::scoped_lock<std::mutex> lock(latch_);
   return GetLocalDepthInternal(dir_index);
 }
 
@@ -88,16 +88,12 @@ auto ExtendibleHashTable<K, V>::Remove(const K &key) -> bool {
 
 template <typename K, typename V>
 void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
-  Bucket *bucket = dir_[IndexOf(key)].get();
-  // V& val = const_cast<V&>(value);  // convert non-const to const to call Find().
   std::scoped_lock<std::mutex> lock(latch_);
-  if (bucket->IsFull()) {
-    int origin_index = IndexOf(key);                        // original index of bucket.
-    if (GetLocalDepth(IndexOf(key)) == GetGlobalDepth()) {  // expand the space of dir.
-      global_depth_++;                                      // increment global depth.
-      // directory.
-      // int before_len = dir_.size();  // the dir_ length before resize() calling.
-      // resize() will change the number of elements and capacity of vector.
+  Bucket *bucket = dir_[IndexOf(key)].get();
+  while (bucket->IsFull()) {                     // loop call Insert() untill the split bucket is not full.
+    int origin_index = IndexOf(key);             // original index of bucket.
+    if (bucket->GetDepth() == global_depth_) {   // expand the space of dir.
+      global_depth_++;                           // increment global depth.
       size_t n = dir_.size();                    // original size.
       dir_.resize(global_depth_ << 1, nullptr);  // double the size of
       // initialize expanded part of dir_.
@@ -105,31 +101,12 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
       for (size_t i = n; i < dir_.size(); ++i) {
         dir_[i] = dir_[i & mask];
       }
-      // dir_.resize(global_depth_ * 2, nullptr);  // double the size of directory.
-      // int len = dir_.size();                    // the dir_ length before resize() calling.
-      // initialize the augment slot in dir_.
-      // for (int i = before_len; i < len; ++i) {
-      //   dir_[i] = std::make_shared<Bucket>(bucket_size_, global_depth_);
-      //   num_buckets_++;
-      // }
     }
     // if global depth not eqaul to local depth, it does not need to expand dir_ space.
     bucket->IncrementDepth();                              // increment local depth.
     RedistributeBucket(dir_[origin_index], origin_index);  // pass original bucket.
-    // // rearrange pointer.
-    // for (int i = 0; i < n; ++i) {
-    //   if (dir_[i].get()->GetLocalDepth() != GetGlobalDepth()) {  // occur multiple pointers point same buckets.
-    //   }
-    // }
-    // for (int i = n/2; i < n; ++i) {
-    //   if (dir_[i] == nullptr) {
-    //     dir_[i] = dir_[i/2];
-    //   }
-    // }
+
     bucket = dir_[IndexOf(key)].get();
-  }
-  if (bucket->IsFull()) {  // recursive call insert untill the split bucket is not full.
-    Insert(key, value);
   }
   bucket->Insert(key, value);  // updated.
 }
@@ -147,7 +124,6 @@ void ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucke
       num_buckets_++;       // increase the numbers of buckets.
       del.push_back(elem);  // bookkeeping the elements will be deleted
     }
-    // reshuffle the elements in the bucket which will be overflowed to other bucket.
   }
   for (auto &e : del) {
     list.remove(e);
