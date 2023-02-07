@@ -92,16 +92,16 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   // V& val = const_cast<V&>(value);  // convert non-const to const to call Find().
   std::scoped_lock<std::mutex> lock(latch_);
   if (bucket->IsFull()) {
-    int origin_index = IndexOf(key);  // original index of bucket.
+    int origin_index = IndexOf(key);                        // original index of bucket.
     if (GetLocalDepth(IndexOf(key)) == GetGlobalDepth()) {  // expand the space of dir.
-      global_depth_++;  // increment global depth.
+      global_depth_++;                                      // increment global depth.
       // directory.
       // int before_len = dir_.size();  // the dir_ length before resize() calling.
       // resize() will change the number of elements and capacity of vector.
-      size_t n = dir_.size();  // original size.
-      dir_.resize(global_depth_<<1, nullptr);  // double the size of
+      size_t n = dir_.size();                    // original size.
+      dir_.resize(global_depth_ << 1, nullptr);  // double the size of
       // initialize expanded part of dir_.
-      int mask = (1 << (global_depth_-1))-1;  // get rid of the the largest bit of hash Index.
+      int mask = (1 << (global_depth_ - 1)) - 1;  // get rid of the the largest bit of hash Index.
       for (size_t i = n; i < dir_.size(); ++i) {
         dir_[i] = dir_[i & mask];
       }
@@ -114,7 +114,7 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
       // }
     }
     // if global depth not eqaul to local depth, it does not need to expand dir_ space.
-    bucket->IncrementDepth();  // increment local depth.
+    bucket->IncrementDepth();                              // increment local depth.
     RedistributeBucket(dir_[origin_index], origin_index);  // pass original bucket.
     // // rearrange pointer.
     // for (int i = 0; i < n; ++i) {
@@ -140,11 +140,11 @@ void ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucke
   std::vector<std::pair<K, V>> del;  // elements will be deleted.
   for (auto &elem : list) {
     size_t dir_index = IndexOf(elem.first);
-    if (dir_index != origin_index) {  // rearrange pointer.
+    if (dir_index != origin_index) {                                            // rearrange pointer.
       dir_[dir_index] = std::make_shared<Bucket>(bucket_size_, global_depth_);  // split. create new bucket.
-      Bucket* b = dir_[dir_index].get();
+      Bucket *b = dir_[dir_index].get();
       b->Insert(elem.first, elem.second);
-      num_buckets_++;  // increase the numbers of buckets.
+      num_buckets_++;       // increase the numbers of buckets.
       del.push_back(elem);  // bookkeeping the elements will be deleted
     }
     // reshuffle the elements in the bucket which will be overflowed to other bucket.
