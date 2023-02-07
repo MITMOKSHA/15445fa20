@@ -90,12 +90,12 @@ template <typename K, typename V>
 void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   std::scoped_lock<std::mutex> lock(latch_);
   Bucket *bucket = dir_[IndexOf(key)].get();
-  while (bucket->IsFull()) {                     // loop call Insert() untill the split bucket is not full.
-    int origin_index = IndexOf(key);             // original index of bucket.
-    if (bucket->GetDepth() == global_depth_) {   // expand the space of dir.
-      global_depth_++;                           // increment global depth.
-      size_t n = dir_.size();                    // original size.
-      dir_.resize(global_depth_ << 1, nullptr);  // double the size of
+  while (bucket->IsFull()) {                    // loop call Insert() untill the split bucket is not full.
+    int origin_index = IndexOf(key);            // original index of bucket.
+    if (bucket->GetDepth() == global_depth_) {  // expand the space of dir.
+      global_depth_++;                          // increment global depth.
+      size_t n = dir_.size();                   // original size.
+      dir_.resize(dir_.size() << 1, nullptr);   // double the size of
       // initialize expanded part of dir_.
       int mask = (1 << (global_depth_ - 1)) - 1;  // get rid of the the largest bit of hash Index.
       for (size_t i = n; i < dir_.size(); ++i) {
@@ -103,8 +103,25 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
       }
     }
     // if global depth not eqaul to local depth, it does not need to expand dir_ space.
-    bucket->IncrementDepth();                              // increment local depth.
-    RedistributeBucket(dir_[origin_index], origin_index);  // pass original bucket.
+    bucket->IncrementDepth();  // increment local depth.
+    // 3.create a new bucket.
+    std::shared_ptr<Bucket> new_bucket =
+        std::make_shared<Bucket>(bucket_size_, bucket->GetDepth());  // split. create new bucket.
+    num_buckets_++;                                                  // increase the numbers of buckets.
+    // 4. rearrange pointers.
+    size_t cur_mask = (1 << bucket->GetDepth()) - 1;
+    size_t pre_mask = cur_mask >> 1;
+    // size_t largest_bit = 1 << (bucket->GetDepth()-1);  // the largest bit of hash index.
+    std::shared_ptr<Bucket> splitted_bucket = dir_[origin_index];  // bookkeeping the splitted bucket.
+    for (size_t i = 0; i < dir_.size(); ++i) {
+      if ((pre_mask & i) == (pre_mask & origin_index) &&
+          ((cur_mask & i) >> (bucket->GetDepth() - 1) == 1)) {  // sibling
+        // if largest bit equals to 1, point to new sets.
+        dir_[i] = new_bucket;
+      }
+    }
+    // 5.redistribute splitted bucket K, V pairs
+    RedistributeBucket(splitted_bucket, new_bucket);  // pass original bucket.
 
     bucket = dir_[IndexOf(key)].get();
   }
@@ -112,16 +129,14 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
 }
 
 template <typename K, typename V>
-void ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucket, size_t origin_index) {
+void ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucket, std::shared_ptr<Bucket> new_bucket) {
   auto &list = bucket->GetItems();
   std::vector<std::pair<K, V>> del;  // elements will be deleted.
   for (auto &elem : list) {
     size_t dir_index = IndexOf(elem.first);
-    if (dir_index != origin_index) {                                            // rearrange pointer.
-      dir_[dir_index] = std::make_shared<Bucket>(bucket_size_, global_depth_);  // split. create new bucket.
-      Bucket *b = dir_[dir_index].get();
+    if (dir_[dir_index] == new_bucket) {  // rearrange pointer.
+      Bucket *b = new_bucket.get();
       b->Insert(elem.first, elem.second);
-      num_buckets_++;       // increase the numbers of buckets.
       del.push_back(elem);  // bookkeeping the elements will be deleted
     }
   }
