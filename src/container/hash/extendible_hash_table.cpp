@@ -92,40 +92,62 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   // V& val = const_cast<V&>(value);  // convert non-const to const to call Find().
   std::scoped_lock<std::mutex> lock(latch_);
   if (bucket->IsFull()) {
-    int origin = IndexOf(key);  // original index of bucket.
-    if (GetLocalDepth(IndexOf(key)) == GetGlobalDepth()) {
+    int origin_index = IndexOf(key);  // original index of bucket.
+    if (GetLocalDepth(IndexOf(key)) == GetGlobalDepth()) {  // expand the space of dir.
       global_depth_++;  // increment global depth.
+      // directory.
+      // int before_len = dir_.size();  // the dir_ length before resize() calling.
+      // resize() will change the number of elements and capacity of vector.
+      size_t n = dir_.size();  // original size.
+      dir_.resize(global_depth_<<1, nullptr);  // double the size of
+      // initialize expanded part of dir_.
+      int mask = (1 << (global_depth_-1))-1;  // get rid of the the largest bit of hash Index.
+      for (size_t i = n; i < dir_.size(); ++i) {
+        dir_[i] = dir_[i & mask];
+      }
+      // dir_.resize(global_depth_ * 2, nullptr);  // double the size of directory.
+      // int len = dir_.size();                    // the dir_ length before resize() calling.
+      // initialize the augment slot in dir_.
+      // for (int i = before_len; i < len; ++i) {
+      //   dir_[i] = std::make_shared<Bucket>(bucket_size_, global_depth_);
+      //   num_buckets_++;
+      // }
     }
+    // if global depth not eqaul to local depth, it does not need to expand dir_ space.
     bucket->IncrementDepth();  // increment local depth.
-    // wrong implementation.
-    // dir_.resize(global_depth_*2, std::make_shared<Bucket>(bucket_size_, global_depth_));  // double the size of
-    // directory.
-    int before_len = dir_.size();  // the dir_ length before resize() calling.
-    // resize() will change the number of elements and capacity of vector.
-    dir_.resize(global_depth_ * 2, nullptr);  // double the size of directory.
-    int len = dir_.size();                    // the dir_ length before resize() calling.
-    // initialize the augment slot in dir_.
-    for (int i = before_len; i < len; ++i) {
-      dir_[i] = std::make_shared<Bucket>(bucket_size_, global_depth_);
-      num_buckets_++;
-    }
-    RedistributeBucket(dir_[origin]);  // pass original bucket.
+    RedistributeBucket(dir_[origin_index], origin_index);  // pass original bucket.
+    // // rearrange pointer.
+    // for (int i = 0; i < n; ++i) {
+    //   if (dir_[i].get()->GetLocalDepth() != GetGlobalDepth()) {  // occur multiple pointers point same buckets.
+    //   }
+    // }
+    // for (int i = n/2; i < n; ++i) {
+    //   if (dir_[i] == nullptr) {
+    //     dir_[i] = dir_[i/2];
+    //   }
+    // }
     bucket = dir_[IndexOf(key)].get();
+  }
+  if (bucket->IsFull()) {  // recursive call insert untill the split bucket is not full.
+    Insert(key, value);
   }
   bucket->Insert(key, value);  // updated.
 }
 
 template <typename K, typename V>
-void ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucket) {
+void ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucket, size_t origin_index) {
   auto &list = bucket->GetItems();
   std::vector<std::pair<K, V>> del;  // elements will be deleted.
   for (auto &elem : list) {
-    std::shared_ptr<Bucket> b = dir_[IndexOf(elem.first)];
-    // reshuffle the elements in the bucket which will be overflowed to other bucket.
-    if (b != bucket) {
+    size_t dir_index = IndexOf(elem.first);
+    if (dir_index != origin_index) {  // rearrange pointer.
+      dir_[dir_index] = std::make_shared<Bucket>(bucket_size_, global_depth_);  // split. create new bucket.
+      Bucket* b = dir_[dir_index].get();
       b->Insert(elem.first, elem.second);
+      num_buckets_++;  // increase the numbers of buckets.
       del.push_back(elem);  // bookkeeping the elements will be deleted
     }
+    // reshuffle the elements in the bucket which will be overflowed to other bucket.
   }
   for (auto &e : del) {
     list.remove(e);

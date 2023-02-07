@@ -179,8 +179,9 @@ class ExtendibleHashTable : public HashTable<K, V> {
   /**
    * @brief Redistribute the kv pairs in a full bucket.
    * @param bucket The bucket to be redistributed.
+   * @param origin_index The original index of split bucket.
    */
-  auto RedistributeBucket(std::shared_ptr<Bucket> bucket) -> void;
+  auto RedistributeBucket(std::shared_ptr<Bucket> bucket, size_t origin_index) -> void;
 
   /*****************************************************************
    * Must acquire latch_ first before calling the below functions. *
