@@ -22,6 +22,7 @@
 
 #include "common/config.h"
 #include "common/macros.h"
+#include "common/logger.h"
 
 #define INF INT_MAX
 
