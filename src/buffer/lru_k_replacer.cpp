@@ -17,7 +17,8 @@ namespace bustub {
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k) {
   LOG_INFO("initialize LRUKReplacer(%ld, %ld)", num_frames, k);
   BUSTUB_ASSERT(k != 0, "elicit value of k!");
-  record_.assign(num_frames+1, std::vector<int>());  // initialize the num_frames of empty vector to record K's access.
+  record_.assign(num_frames + 1,
+                 std::vector<int>());  // initialize the num_frames of empty vector to record K's access.
 }
 
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
@@ -58,7 +59,8 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
         break;
       }
     }
-    lru_replacer_.splice(l, lru_replacer_, it->second);  // put the current k,v pair to the concrete site of LRU replacer.
+    lru_replacer_.splice(l, lru_replacer_,
+                         it->second);  // put the current k,v pair to the concrete site of LRU replacer.
   }
   ++current_timestamp_;  // every access with incrementing time stamp.
 }
