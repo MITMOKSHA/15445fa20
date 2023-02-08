@@ -27,12 +27,12 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
     return false;
   }
   frame_id_t f_id = lru_replacer_.back().first;
-  record_[f_id].clear();  // remove the frame's access history.
-  lru_replacer_.pop_back();    // evict the frame with largest backward k-distance.
+  record_[f_id].clear();     // remove the frame's access history.
+  lru_replacer_.pop_back();  // evict the frame with largest backward k-distance.
   hash_.erase(f_id);
   curr_size_--;
   *frame_id = f_id;
-  LOG_INFO("Evict the frame %d and %s", *frame_id, lru_replacer_.empty()? "failed": "success");
+  LOG_INFO("Evict the frame %d and %s", *frame_id, lru_replacer_.empty() ? "failed" : "success");
   return true;
 }
 
@@ -65,7 +65,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
 }
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
-  LOG_INFO("SetEvictable(%d, %s)", frame_id, set_evictable? "true": "false");
+  LOG_INFO("SetEvictable(%d, %s)", frame_id, set_evictable ? "true" : "false");
   std::scoped_lock<std::mutex> lock(latch_);
   // BUSTUB_ASSERT(frame_id <= (int)replacer_size_, "frame id is invalid.");
   BUSTUB_ASSERT(!record_[frame_id].empty(), "frame id is invalid.");
