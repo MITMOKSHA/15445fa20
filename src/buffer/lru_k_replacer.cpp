@@ -20,6 +20,7 @@ LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_fra
 }
 
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
+  std::scoped_lock<std::mutex> lock(latch_);
   if (lru_replacer_.empty()) {
     return false;
   }
@@ -32,6 +33,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
 }
 
 void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
+  std::scoped_lock<std::mutex> lock(latch_);
   BUSTUB_ASSERT(frame_id <= (int)replacer_size_, "frame id is invalid.");
   auto &timestamp_arr = record_[frame_id];
   timestamp_arr.push_back(current_timestamp_);  // update elements of record array.
@@ -57,6 +59,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
 }
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
+  std::scoped_lock<std::mutex> lock(latch_);
   // BUSTUB_ASSERT(frame_id <= (int)replacer_size_, "frame id is invalid.");
   BUSTUB_ASSERT(!record_[frame_id].empty(), "frame id is invalid.");
   auto timestamp_arr = record_[frame_id];
@@ -83,7 +86,7 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
       lru_replacer_.insert(l, {frame_id, curr_k_distance});  // insert before l.
       hash_.insert({frame_id, std::prev(l, 1)});             // update the current frame's iterator in hash table.
     }
-    curr_size_++;
+    curr_size_++;  // increase the size of replacer.
   } else if (!set_evictable && it != hash_.end()) {  // evictable to non-evictable
     lru_replacer_.remove({frame_id, it->second->second});
     hash_.erase(frame_id);
@@ -92,6 +95,7 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
 }
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
+  std::scoped_lock<std::mutex> lock(latch_);
   // BUSTUB_ASSERT(hash_, "not be able to remove non-evictable frame.");
   auto it = hash_.find(frame_id);
   if (it == hash_.end()) {  // frame_id not found.
@@ -103,6 +107,9 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {
   curr_size_--;
 }
 
-auto LRUKReplacer::Size() -> size_t { return curr_size_; }
+auto LRUKReplacer::Size() -> size_t {
+  std::scoped_lock<std::mutex> lock(latch_);
+  return curr_size_;
+}
 
 }  // namespace bustub

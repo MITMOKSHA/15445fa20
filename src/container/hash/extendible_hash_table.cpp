@@ -96,7 +96,7 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
       global_depth_++;                          // increment global depth.
       size_t n = dir_.size();                   // original size.
       dir_.resize(dir_.size() << 1, nullptr);   // double the size of
-      // initialize expanded part of dir_.
+      // initialize the hash index of expanded part of dir_.
       int mask = (1 << (global_depth_ - 1)) - 1;  // get rid of the the largest bit of hash Index.
       for (size_t i = n; i < dir_.size(); ++i) {
         dir_[i] = dir_[i & mask];
