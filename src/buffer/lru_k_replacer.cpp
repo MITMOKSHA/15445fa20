@@ -86,7 +86,7 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
       lru_replacer_.insert(l, {frame_id, curr_k_distance});  // insert before l.
       hash_.insert({frame_id, std::prev(l, 1)});             // update the current frame's iterator in hash table.
     }
-    curr_size_++;  // increase the size of replacer.
+    curr_size_++;                                    // increase the size of replacer.
   } else if (!set_evictable && it != hash_.end()) {  // evictable to non-evictable
     lru_replacer_.remove({frame_id, it->second->second});
     hash_.erase(frame_id);
