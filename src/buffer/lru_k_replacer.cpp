@@ -17,7 +17,7 @@ namespace bustub {
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k) {
   LOG_INFO("initialize LRUKReplacer(%ld, %ld)", num_frames, k);
   BUSTUB_ASSERT(k != 0, "elicit value of k!");
-  record_.assign(num_frames + 1,
+  record_.assign(num_frames,
                  std::vector<int>());  // initialize the num_frames of empty vector to record K's access.
 }
 
@@ -39,7 +39,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
 
 void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   std::scoped_lock<std::mutex> lock(latch_);
-  BUSTUB_ASSERT(frame_id <= (int)replacer_size_, "frame id is invalid.");
+  BUSTUB_ASSERT(frame_id < (int)replacer_size_, "frame id is invalid.");
   auto &timestamp_arr = record_[frame_id];
   timestamp_arr.push_back(current_timestamp_);  // update elements of record array.
   auto it = hash_.find(frame_id);
@@ -69,7 +69,7 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   LOG_INFO("SetEvictable(%d, %s)", frame_id, set_evictable ? "true" : "false");
   std::scoped_lock<std::mutex> lock(latch_);
   // BUSTUB_ASSERT(frame_id <= (int)replacer_size_, "frame id is invalid.");
-  BUSTUB_ASSERT(frame_id <= (int)(replacer_size_), "frame id is invalid.");
+  BUSTUB_ASSERT(frame_id < (int)(replacer_size_), "frame id is invalid.");
   auto timestamp_arr = record_[frame_id];
   // teminate if the frame does not have record.
   if (timestamp_arr.empty()) {
