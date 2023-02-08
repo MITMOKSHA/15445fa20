@@ -17,7 +17,7 @@ namespace bustub {
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k) {
   LOG_INFO("initialize LRUKReplacer(%ld, %ld)", num_frames, k);
   BUSTUB_ASSERT(k != 0, "elicit value of k!");
-  record_.assign(num_frames, std::vector<int>());  // initialize the num_frames of empty vector to record K's access.
+  record_.assign(num_frames+1, std::vector<int>());  // initialize the num_frames of empty vector to record K's access.
 }
 
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
@@ -48,18 +48,17 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
     if (timestamp_arr.size() >= k_) {
       curr_k_distance = timestamp_arr.back() - timestamp_arr.at(timestamp_arr.size() - k_);
       it->second->second = curr_k_distance;  // update k_distance.
-      LOG_INFO("the frame_id %d current k-distance is %d", frame_id, curr_k_distance);
     }
     auto l = lru_replacer_.begin();
     while (l != lru_replacer_.end()) {
       if ((l->second == curr_k_distance && timestamp_arr.at(0) < record_[l->first].at(0)) ||
-          (l->second < curr_k_distance)) {  // multiple +INF
+          (l->second < curr_k_distance)) {  // multiple +INF || k-distance
         std::advance(l, 1);
       } else {
         break;
       }
     }
-    lru_replacer_.splice(l, lru_replacer_, it->second);
+    lru_replacer_.splice(l, lru_replacer_, it->second);  // put the current k,v pair to the concrete site of LRU replacer.
   }
   ++current_timestamp_;  // every access with incrementing time stamp.
 }
@@ -68,7 +67,7 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   LOG_INFO("SetEvictable(%d, %s)", frame_id, set_evictable ? "true" : "false");
   std::scoped_lock<std::mutex> lock(latch_);
   // BUSTUB_ASSERT(frame_id <= (int)replacer_size_, "frame id is invalid.");
-  BUSTUB_ASSERT(!record_[frame_id].empty(), "frame id is invalid.");
+  BUSTUB_ASSERT(frame_id <= (int)(replacer_size_), "frame id is invalid.");
   auto timestamp_arr = record_[frame_id];
   auto it = hash_.find(frame_id);
   if (set_evictable && it == hash_.end()) {  // non-evictable to evictable
@@ -92,8 +91,8 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
       }
       lru_replacer_.insert(l, {frame_id, curr_k_distance});  // insert before l.
       hash_.insert({frame_id, std::prev(l, 1)});             // update the current frame's iterator in hash table.
-      LOG_INFO("not evictable to evictable: put {frame_id: %d, k-distance: %d}", frame_id, curr_k_distance);
     }
+    LOG_INFO("not evictable to evictable: put {frame_id: %d, k-distance: %d}", frame_id, curr_k_distance);
     curr_size_++;                                    // increase the size of replacer.
   } else if (!set_evictable && it != hash_.end()) {  // evictable to non-evictable
     lru_replacer_.remove({frame_id, it->second->second});
