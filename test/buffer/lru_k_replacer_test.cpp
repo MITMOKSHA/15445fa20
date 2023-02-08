@@ -98,7 +98,7 @@ TEST(LRUKReplacerTest, SampleTest) {
   ASSERT_EQ(0, lru_replacer.Size());
 }
 TEST(LRUKReplacerTest, Test2) {
-  LRUKReplacer lru_replacer(10, 3);
+  LRUKReplacer lru_replacer(2, 3);
   int value;
   lru_replacer.RecordAccess(1);
   lru_replacer.RecordAccess(1);
@@ -106,6 +106,9 @@ TEST(LRUKReplacerTest, Test2) {
   lru_replacer.RecordAccess(1);
   lru_replacer.SetEvictable(2, true);
   lru_replacer.SetEvictable(1, true);
+  lru_replacer.Remove(1);
+  lru_replacer.SetEvictable(1, true);
+
   lru_replacer.Evict(&value);
   lru_replacer.Evict(&value);
 }

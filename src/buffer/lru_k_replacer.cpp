@@ -71,6 +71,10 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   // BUSTUB_ASSERT(frame_id <= (int)replacer_size_, "frame id is invalid.");
   BUSTUB_ASSERT(frame_id <= (int)(replacer_size_), "frame id is invalid.");
   auto timestamp_arr = record_[frame_id];
+  // teminate if the frame does not have record.
+  if (timestamp_arr.empty()) {
+    return;
+  }
   auto it = hash_.find(frame_id);
   if (set_evictable && it == hash_.end()) {  // non-evictable to evictable
     // insert suitable location in list.
@@ -79,9 +83,11 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
       curr_k_distance = timestamp_arr.back() - timestamp_arr.at(timestamp_arr.size() - k_);
     }
     if (lru_replacer_.empty()) {
+      // put the frame in front of lruReplacer directly.
       lru_replacer_.push_front({frame_id, curr_k_distance});
       hash_.insert({frame_id, lru_replacer_.begin()});  // update iterator.
     } else {
+      // adjust the frame site in LRU replacer.
       auto l = lru_replacer_.begin();
       while (l != lru_replacer_.end()) {
         if ((l->second == curr_k_distance && timestamp_arr.at(0) < record_[l->first].at(0)) ||
