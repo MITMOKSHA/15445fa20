@@ -25,15 +25,16 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
   std::scoped_lock<std::mutex> lock(latch_);
   if (lru_replacer_.empty()) {
     LOG_INFO("Evict failed");
+    *frame_id = INVALID_PAGE_ID;
     return false;
   }
   frame_id_t f_id = lru_replacer_.back().first;
-  record_[f_id].clear();     // remove the frame's access history.
+  record_[f_id].clear();  // remove the frame's access history.
+  LOG_INFO("Evict frame %d and success! the k-distance is %d", f_id, lru_replacer_.back().second);
   lru_replacer_.pop_back();  // evict the frame with largest backward k-distance.
   hash_.erase(f_id);
   curr_size_--;
   *frame_id = f_id;
-  LOG_INFO("Evict frame %d and success!", *frame_id);
   return true;
 }
 
