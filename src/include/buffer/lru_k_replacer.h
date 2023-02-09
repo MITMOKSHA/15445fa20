@@ -145,9 +145,10 @@ class LRUKReplacer {
   size_t replacer_size_;
   size_t k_;
   std::mutex latch_;
-  std::list<std::pair<int, int>> lru_replacer_;  // <frame_id, k_distance>
-  std::vector<std::vector<int>> record_;         // record the K nums of access history.
-  std::unordered_map<int, std::list<std::pair<int, int>>::iterator> hash_;
+  std::list<int> lru_1_replacer_;                           // <frame_id> store the frame which access times < k times.
+  std::vector<std::vector<int>> record_;                    // record the K nums of access history.
+  std::unordered_map<int, std::list<int>::iterator> hash_;  // store the frame which access history less than k.
+  std::vector<bool> is_evictable_;                          // store the evictable attribute of frames.
 };
 
 }  // namespace bustub

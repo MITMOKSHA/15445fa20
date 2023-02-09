@@ -15,23 +15,59 @@
 namespace bustub {
 
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k) {
-  LOG_INFO("initialize LRUKReplacer(%ld, %ld)", num_frames, k);
+  // LOG_INFO("initialize LRUKReplacer(%ld, %ld)", num_frames, k);
   BUSTUB_ASSERT(k != 0, "elicit value of k!");
   record_.assign(num_frames,
-                 std::vector<int>());  // initialize the num_frames of empty vector to record K's access.
+                 std::vector<int>());       // initialize the num_frames of empty vector to record K's access.
+  is_evictable_.assign(num_frames, false);  // initialize non-evictable;
 }
 
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
   std::scoped_lock<std::mutex> lock(latch_);
-  if (lru_replacer_.empty()) {
-    LOG_INFO("Evict failed");
-    *frame_id = INVALID_PAGE_ID;
+  frame_id_t f_id = INVALID_PAGE_ID;
+  // prior to evict the frame in lru_1_replacer_.
+  if (!lru_1_replacer_.empty()) {  // lru_1_cache_ is not empty.
+    auto ptr = lru_1_replacer_.end();
+    ptr = std::prev(ptr);
+    while (ptr != lru_1_replacer_.begin() && !is_evictable_[*ptr]) {
+      ptr = std::prev(ptr);
+    }
+    // check the front elements of lru_1_replacer.
+    if (!is_evictable_[*ptr]) {  // no frames can be evicted.
+      int earliest_time_stamp = INT_MAX;
+      for (size_t i = 0; i < record_.size(); ++i) {
+        size_t log_num = record_[i].size();
+        if (log_num < k_ ||
+            !is_evictable_[i]) {  // jump the frame that access history times less than k or not-evictable frame.
+          continue;
+        }
+        if (record_[i][log_num - k_] < earliest_time_stamp) {
+          earliest_time_stamp = record_[i][log_num - k_];
+          f_id = i;
+        }
+      }
+    } else {
+      f_id = *ptr;
+      lru_1_replacer_.remove(f_id);
+    }
+  } else {  // >= k
+    int earliest_time_stamp = INT_MAX;
+    for (size_t i = 0; i < record_.size(); ++i) {
+      size_t log_num = record_[i].size();
+      if (log_num < k_ || !is_evictable_[i]) {
+        continue;
+      }
+      if (record_[i][log_num - k_] < earliest_time_stamp) {
+        earliest_time_stamp = record_[i][log_num - k_];
+        f_id = i;
+      }
+    }
+  }
+  if (f_id == INVALID_PAGE_ID) {  // no frames can be evicted.
     return false;
   }
-  frame_id_t f_id = lru_replacer_.back().first;
   record_[f_id].clear();  // remove the frame's access history.
-  LOG_INFO("Evict frame %d and success! the k-distance is %d", f_id, lru_replacer_.back().second);
-  lru_replacer_.pop_back();  // evict the frame with largest backward k-distance.
+  is_evictable_[f_id] = false;
   hash_.erase(f_id);
   curr_size_--;
   *frame_id = f_id;
@@ -43,90 +79,61 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   BUSTUB_ASSERT(frame_id < (int)replacer_size_, "frame id is invalid.");
   auto &timestamp_arr = record_[frame_id];
   timestamp_arr.push_back(current_timestamp_);  // update elements of record array.
+  // >= k_ do nothing.
   auto it = hash_.find(frame_id);
-  LOG_INFO("RecordAccess(%d) at timestamp %ld", frame_id, current_timestamp_);
-  if (it != hash_.end()) {  // exist. LRUreplacer needed to be adjusted.
-    int curr_k_distance = INF;
-    if (timestamp_arr.size() >= k_) {
-      curr_k_distance = timestamp_arr.back() - timestamp_arr.at(timestamp_arr.size() - k_);
-      it->second->second = curr_k_distance;  // update k_distance.
+  if (timestamp_arr.size() < k_) {
+    if (it == hash_.end()) {
+      lru_1_replacer_.push_front(frame_id);
+      hash_.insert({frame_id, lru_1_replacer_.begin()});
     }
-    auto l = lru_replacer_.begin();
-    while (l != lru_replacer_.end()) {
-      if ((l->second == curr_k_distance && timestamp_arr.at(0) < record_[l->first].at(0)) ||
-          (l->second < curr_k_distance)) {  // multiple +INF || k-distance
-        std::advance(l, 1);
-      } else {
-        break;
-      }
+  } else {  // >= k
+    // move it from LRU-1 mode to LRU-k mode.
+    if (it != hash_.end()) {
+      hash_.erase(frame_id);
+      lru_1_replacer_.remove(frame_id);
     }
-    lru_replacer_.splice(l, lru_replacer_,
-                         it->second);  // put the current k,v pair to the concrete site of LRU replacer.
   }
   ++current_timestamp_;  // every access with incrementing time stamp.
 }
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
-  LOG_INFO("SetEvictable(%d, %s)", frame_id, set_evictable ? "true" : "false");
   std::scoped_lock<std::mutex> lock(latch_);
-  // BUSTUB_ASSERT(frame_id <= (int)replacer_size_, "frame id is invalid.");
   BUSTUB_ASSERT(frame_id < (int)(replacer_size_), "frame id is invalid.");
   auto timestamp_arr = record_[frame_id];
   // teminate if the frame does not have record.
   if (timestamp_arr.empty()) {
     return;
   }
-  auto it = hash_.find(frame_id);
-  if (set_evictable && it == hash_.end()) {  // non-evictable to evictable
-    // insert suitable location in list.
-    int curr_k_distance = INF;
-    if (timestamp_arr.size() >= k_) {
-      curr_k_distance = timestamp_arr.back() - timestamp_arr.at(timestamp_arr.size() - k_);
-    }
-    if (lru_replacer_.empty()) {
-      // put the frame in front of lruReplacer directly.
-      lru_replacer_.push_front({frame_id, curr_k_distance});
-      hash_.insert({frame_id, lru_replacer_.begin()});  // update iterator.
-    } else {
-      // adjust the frame site in LRU replacer.
-      auto l = lru_replacer_.begin();
-      while (l != lru_replacer_.end()) {
-        if ((l->second == curr_k_distance && timestamp_arr.at(0) < record_[l->first].at(0)) ||
-            (l->second < curr_k_distance)) {  // multiple +INF
-          std::advance(l, 1);
-        } else {
-          break;
-        }
-      }
-      lru_replacer_.insert(l, {frame_id, curr_k_distance});  // insert before l.
-      hash_.insert({frame_id, std::prev(l, 1)});             // update the current frame's iterator in hash table.
-    }
-    LOG_INFO("not evictable to evictable: put {frame_id: %d, k-distance: %d}", frame_id, curr_k_distance);
-    curr_size_++;                                    // increase the size of replacer.
-  } else if (!set_evictable && it != hash_.end()) {  // evictable to non-evictable
-    lru_replacer_.remove({frame_id, it->second->second});
-    hash_.erase(frame_id);
+  bool pre_status = is_evictable_[frame_id];  // the previous evictable status of the frame.
+  if (!pre_status && set_evictable) {         // non-evictable to evictable
+    is_evictable_[frame_id] = set_evictable;
+    curr_size_++;                             // increase the size of replacer.
+  } else if (pre_status && !set_evictable) {  // evictable to non-evictable
+    is_evictable_[frame_id] = set_evictable;
     curr_size_--;
-    LOG_INFO("evictable to non-evictable: frame_id: %d out of lru replacer", frame_id);
   }
 }
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
-  LOG_INFO("Remove(%d)", frame_id);
+  // LOG_INFO("Remove(%d)", frame_id);
   std::scoped_lock<std::mutex> lock(latch_);
-  // BUSTUB_ASSERT(hash_, "not be able to remove non-evictable frame.");
-  auto it = hash_.find(frame_id);
-  if (it == hash_.end()) {  // frame_id not found.
+  auto timestamp_arr = record_[frame_id];
+  if (timestamp_arr.empty()) {  // frame is not found.
     return;
   }
+  BUSTUB_ASSERT(is_evictable_[frame_id], "not be abled to remove non-evictable frame.");
+  if (timestamp_arr.size() < k_) {
+    lru_1_replacer_.remove(frame_id);
+    hash_.erase(frame_id);
+  }
+  // >= k_  do nothing.
+  is_evictable_[frame_id] = false;
   record_[frame_id].clear();  // remove the frame's access history.
-  lru_replacer_.remove({frame_id, it->second->second});
-  hash_.erase(frame_id);
   curr_size_--;
 }
 
 auto LRUKReplacer::Size() -> size_t {
-  LOG_INFO("the size of LRU Replacer is %ld", curr_size_);
+  // LOG_INFO("the size of LRU Replacer is %ld", curr_size_);
   std::scoped_lock<std::mutex> lock(latch_);
   return curr_size_;
 }
