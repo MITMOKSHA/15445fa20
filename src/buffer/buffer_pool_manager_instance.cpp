@@ -126,8 +126,6 @@ auto BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) -> bool {
   }
   disk_manager_->WritePage(page_id, pages_[f_id].data_);
   pages_[f_id].is_dirty_ = false;  // unset the dirty flag after flush.
-  // memset(pages_[f_id].data_, '\0', BUSTUB_PAGE_SIZE);
-  // page_table_->Remove(page_id);
   return true;
 }
 
