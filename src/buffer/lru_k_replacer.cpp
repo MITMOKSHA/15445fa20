@@ -115,7 +115,6 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
 }
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
-  // LOG_INFO("Remove(%d)", frame_id);
   std::scoped_lock<std::mutex> lock(latch_);
   auto timestamp_arr = record_[frame_id];
   if (timestamp_arr.empty()) {  // frame is not found.
@@ -133,7 +132,6 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {
 }
 
 auto LRUKReplacer::Size() -> size_t {
-  // LOG_INFO("the size of LRU Replacer is %ld", curr_size_);
   std::scoped_lock<std::mutex> lock(latch_);
   return curr_size_;
 }
